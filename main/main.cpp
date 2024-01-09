@@ -19,6 +19,7 @@
 #include <rclc/executor.h>
 
 #include <drone_controller_messages/msg/pwm_message.h>
+#include <drone_controller_messages/msg/attitude_setpoint.h>
 
 #ifdef CONFIG_MICRO_ROS_ESP_XRCE_DDS_MIDDLEWARE
 #include <rmw_microros/rmw_microros.h>
@@ -36,7 +37,7 @@ std_msgs__msg__Int32MultiArray recv_msg;
 std_msgs__msg__Int32 msg;
 
 drone_controller_messages__msg__PwmMessage pwm_recv_msg;
-
+drone_controller_messages__msg__AttitudeSetpoint attitude_recv_msg;
 
 rcl_subscription_t subscriber;
 std_msgs__msg__Int32 recv_int_msg;
