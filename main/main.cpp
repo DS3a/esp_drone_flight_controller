@@ -88,7 +88,7 @@ void pwm_subscription_callback(const void * msgin) {
 		motor_pwm_values->back_right,
 		motor_pwm_values->back_left
 	);
-	// motor_pwm_value_mutex.unlock();
+	motor_pwm_value_mutex.unlock();
 }
 
 void micro_ros_task(void * arg)
@@ -182,7 +182,11 @@ extern "C" void app_main(void)
     ESP_ERROR_CHECK(uros_network_interface_initialize());
 #endif
 
-	// TODO create a task to write pwm values
+	/* TODO create a task to write pwm values to the motors
+	 * Before reading the motor values from `motor_pwm_values`, check the time when the last commands came in
+	 * If the time is more than 1/pingrate then there is a connection error
+	 * In this case use the IMUs magnetometer, gyro, and depth sensor to land
+	 */
 
 	// TODO task to read imu and height sensor
 
@@ -191,6 +195,6 @@ extern "C" void app_main(void)
             "uros_task",
             16000,
             NULL,
-            5,
+            5, // FIXME look into the RTOS priority settings
             NULL);
 }
