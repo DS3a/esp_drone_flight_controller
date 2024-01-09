@@ -1,11 +1,9 @@
-# _Sample project_
+# _Flight Controller based on ESP32, MPU6050, Infrared Ranger(height), and Motion Capture_
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
+This is the firmware to be flashed onto the Esp32
+Before building this project, clone https://github.com/micro-ROS/micro_ros_espidf_component.git to the `components` directory (create it if non-existent).
 
-This is the simplest buildable example. The example is used by command `idf.py create-project`
-that copies the project to user specified path and set it's name. For more information follow the [docs page](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#start-a-new-project)
-
-
+After cloning that, go into the cloned folder and clone https://github.com/DS3a/drone_flight_controller_ros_msgs.git into `extra_packages` (this should exist, if it doesn't you're probably in the wrong directory)
 
 ## How to use example
 We encourage the users to use the example as a template for the new projects.
