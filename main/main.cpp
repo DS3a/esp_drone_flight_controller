@@ -18,6 +18,8 @@
 #include <rclc/rclc.h>
 #include <rclc/executor.h>
 
+#include <drone_controller_messages/msg/pwm_message.h>
+
 #ifdef CONFIG_MICRO_ROS_ESP_XRCE_DDS_MIDDLEWARE
 #include <rmw_microros/rmw_microros.h>
 #endif
@@ -29,8 +31,15 @@
 
 rcl_publisher_t publisher;
 rcl_subscription_t pwm_subscription;
+
+std_msgs__msg__Int32MultiArray recv_msg;
 std_msgs__msg__Int32 msg;
-// std_msgs__msg__Int32MultiArray pwm_msg;
+
+drone_controller_messages__msg__PwmMessage pwm_recv_msg;
+
+
+rcl_subscription_t subscriber;
+std_msgs__msg__Int32 recv_int_msg;
 
 typedef struct {
 	uint32_t front_left;
@@ -38,6 +47,7 @@ typedef struct {
 	uint32_t back_right;
 	uint32_t back_left;
 } motor_pwm_values_t;
+
 
 std::shared_ptr<motor_pwm_values_t> motor_pwm_values;
 std::shared_ptr<uint32_t> last_value_time;
@@ -47,23 +57,37 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time)
 {
 	RCLC_UNUSED(last_call_time);
 	if (timer != NULL) {
-		printf("Publishing: %d\n", (int) msg.data);
+		// printf("Publishing: %d\n", (int) msg.data);
 		RCSOFTCHECK(rcl_publish(&publisher, &msg, NULL));
 		msg.data++;
 	}
 }
 
-void pwm_subscription_callback(const void * msgin) {
-	motor_pwm_value_mutex.lock();
-	const std_msgs__msg__Int32MultiArray *pwm_values_msg = (const std_msgs__msg__Int32MultiArray *)msgin;
+void subscription_callback(const void * msgin)
+{
+	const std_msgs__msg__Int32 * msg = (const std_msgs__msg__Int32 *)msgin;
+	printf("Received: %d\n",  (int)  msg->data);
+}
 
-	motor_pwm_values->front_left = pwm_values_msg->data.data[0];
-	motor_pwm_values->front_right = pwm_values_msg->data.data[1];
-	motor_pwm_values->back_right = pwm_values_msg->data.data[2];
-	motor_pwm_values->back_left = pwm_values_msg->data.data[3];
+void pwm_subscription_callback(const void * msgin) {
+	printf("received pwm values\n");
+	motor_pwm_value_mutex.lock();
+	// const std_msgs__msg__Int32MultiArray *pwm_values_msg = (const std_msgs__msg__Int32MultiArray *)msgin;
+
+	const drone_controller_messages__msg__PwmMessage *pwm_values_msg = (const drone_controller_messages__msg__PwmMessage *)msgin;
+	motor_pwm_values->front_left = pwm_values_msg->front_left;
+	motor_pwm_values->front_right = pwm_values_msg->front_right;
+	motor_pwm_values->back_right = pwm_values_msg->back_right;
+	motor_pwm_values->back_left = pwm_values_msg->back_left;
 	*last_value_time = esp_timer_get_time() / 1000;
-	
-	motor_pwm_value_mutex.unlock();
+
+	printf("fl: %ld\t fr: %ld\t br: %ld\t bl: %ld\n",
+		motor_pwm_values->front_left,
+		motor_pwm_values->front_right,
+		motor_pwm_values->back_right,
+		motor_pwm_values->back_left
+	);
+	// motor_pwm_value_mutex.unlock();
 }
 
 void micro_ros_task(void * arg)
@@ -97,17 +121,24 @@ void micro_ros_task(void * arg)
 		ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
 		"drone_status"));
 
+	// Create subscriber.
+	RCCHECK(rclc_subscription_init_default(
+		&subscriber,
+		&node,
+		ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
+		"int32_sub"));
+
 	RCCHECK(rclc_subscription_init_default(
 		&pwm_subscription,
 		&node,
-		ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32MultiArray),
-		"int32_subscriber"));
-
-
+		// rosidl_typesupport_c__get_message_type_support_handle__drone_controller_messages__msg__PwmMessage,
+		ROSIDL_GET_MSG_TYPE_SUPPORT(drone_controller_messages, msg, PwmMessage),
+		// ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32MultiArray),
+		"pwm_values"));
 
 	// create timer,
 	rcl_timer_t timer;
-	const unsigned int timer_timeout = 1000;
+	const unsigned int timer_timeout = 0500;
 	RCCHECK(rclc_timer_init_default(
 		&timer,
 		&support,
@@ -116,17 +147,28 @@ void micro_ros_task(void * arg)
 
 	// create executor
 	rclc_executor_t executor;
-	RCCHECK(rclc_executor_init(&executor, &support.context, 1, &allocator));
+	RCCHECK(rclc_executor_init(&executor, &support.context, 5, &allocator));
 	RCCHECK(rclc_executor_add_timer(&executor, &timer));
+
+	// Add timer and subscriber to executor.
+	RCCHECK(rclc_executor_add_subscription(&executor, &subscriber, &recv_int_msg, &subscription_callback, ON_NEW_DATA));
+	printf("creating pwm subscription\n");
+
+	recv_msg.data.capacity = 4;
+	recv_msg.data.size = 0;
+	recv_msg.data.data = (int32_t*) malloc(recv_msg.data.capacity * sizeof(int32_t));
+
+	// RCCHECK(rclc_executor_add_subscription(&executor, &pwm_subscription, &recv_msg, &pwm_subscription_callback, ON_NEW_DATA));
 
 	msg.data = 0;
 
 	while(1){
-		rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
-		usleep(10000);
+		rclc_executor_spin_some(&executor, RCL_MS_TO_NS(1));
+		usleep(1000);
 	}
 
 	// free resources
+	RCCHECK(rcl_subscription_fini(&pwm_subscription, &node));
 	RCCHECK(rcl_publisher_fini(&publisher, &node));
 	RCCHECK(rcl_node_fini(&node));
 

@@ -8,7 +8,8 @@
                 "${config:idf.espIdfPathWin}/components/**",
                 "${config:idf.espAdfPath}/components/**",
                 "${config:idf.espAdfPathWin}/components/**",
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/**",
+                "/opt/esp/idf/components/freertos/FreeRTOS-Kernel-SMP/portable/xtensa/include/freertos"
             ],
             "browse": {
                 "path": [
@@ -20,6 +21,17 @@
                 ],
                 "limitSymbolsToIncludedHeaders": false
             }
+        },
+        {
+            "name": "esp_idf_config",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "compilerPath": "/home/ds3a/.espressif/tools/xtensa-esp-elf/esp-13.2.0_20230928/xtensa-esp-elf/bin/xtensa-esp32-elf-gcc",
+            "cStandard": "c17",
+            "cppStandard": "gnu++17",
+            "intelliSenseMode": "linux-gcc-x64"
         }
     ],
     "version": 4
