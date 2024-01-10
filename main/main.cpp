@@ -38,7 +38,6 @@
 #define DEBUG
 
 
-rcl_publisher_t publisher;
 rcl_subscription_t pwm_subscription;
 
 std_msgs__msg__Int32 msg;
@@ -58,14 +57,6 @@ std::shared_ptr<uint32_t> last_value_time;
 std::mutex motor_pwm_value_mutex;
 std::shared_ptr<DroneHardwareLayer::DroneSensors> sensors;
 
-void timer_callback(rcl_timer_t * timer, int64_t last_call_time) {
-	RCLC_UNUSED(last_call_time);
-	if (timer != NULL) {
-		// printf("Publishing: %d\n", (int) msg.data);
-		RCSOFTCHECK(rcl_publish(&publisher, &msg, NULL));
-		msg.data++;
-	}
-}
 
 void pwm_subscription_callback(const void * msgin) {
 #ifdef DEBUG
@@ -115,32 +106,15 @@ void micro_ros_task(void * arg) {
 	rcl_node_t node;
 	RCCHECK(rclc_node_init_default(&node, "drone_node", DRONE_NAME, &support));
 
-	// create publisher
-	RCCHECK(rclc_publisher_init_default(
-		&publisher,
-		&node,
-		ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
-		"drone_status"));
-
 	RCCHECK(rclc_subscription_init_default(
 		&pwm_subscription,
 		&node,
 		ROSIDL_GET_MSG_TYPE_SUPPORT(drone_controller_messages, msg, PwmMessage),
 		"pwm_values"));
 
-	// create timer,
-	rcl_timer_t timer;
-	const unsigned int timer_timeout = 5000;
-	RCCHECK(rclc_timer_init_default(
-		&timer,
-		&support,
-		RCL_MS_TO_NS(timer_timeout),
-		timer_callback));
-
-	// create executor
+// create executor
 	rclc_executor_t executor;
-	RCCHECK(rclc_executor_init(&executor, &support.context, 2, &allocator));
-	RCCHECK(rclc_executor_add_timer(&executor, &timer));
+	RCCHECK(rclc_executor_init(&executor, &support.context, 1, &allocator));
 
 	// Add timer and subscriber to executor.
 	printf("creating pwm subscription\n");
@@ -155,7 +129,6 @@ void micro_ros_task(void * arg) {
 
 	// free resources
 	RCCHECK(rcl_subscription_fini(&pwm_subscription, &node));
-	RCCHECK(rcl_publisher_fini(&publisher, &node));
 	RCCHECK(rcl_node_fini(&node));
 
   	vTaskDelete(NULL);
