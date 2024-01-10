@@ -1,3 +1,7 @@
+#define UPDATE_RATE_HZ 100
+#define DRONE_NAME "drone_0"
+
+
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -21,6 +25,8 @@
 #include <drone_controller_messages/msg/pwm_message.h>
 #include <drone_controller_messages/msg/attitude_setpoint.h>
 
+#include <drone_hardware_layer/drone_hardware_layer.hpp>
+
 #ifdef CONFIG_MICRO_ROS_ESP_XRCE_DDS_MIDDLEWARE
 #include <rmw_microros/rmw_microros.h>
 #endif
@@ -28,18 +34,16 @@
 #define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){printf("Failed status on line %d: %d. Aborting.\n",__LINE__,(int)temp_rc);vTaskDelete(NULL);}}
 #define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){printf("Failed status on line %d: %d. Continuing.\n",__LINE__,(int)temp_rc);}}
 
-#define DRONE_NAME "drone_0"
+
+#define DEBUG
+
 
 rcl_publisher_t publisher;
 rcl_subscription_t pwm_subscription;
 
-std_msgs__msg__Int32MultiArray recv_msg;
 std_msgs__msg__Int32 msg;
-
 drone_controller_messages__msg__PwmMessage pwm_recv_msg;
 drone_controller_messages__msg__AttitudeSetpoint attitude_recv_msg;
-
-rcl_subscription_t subscriber;
 std_msgs__msg__Int32 recv_int_msg;
 
 typedef struct {
@@ -49,13 +53,12 @@ typedef struct {
 	uint32_t back_left;
 } motor_pwm_values_t;
 
-
 std::shared_ptr<motor_pwm_values_t> motor_pwm_values;
 std::shared_ptr<uint32_t> last_value_time;
 std::mutex motor_pwm_value_mutex;
+std::shared_ptr<DroneHardwareLayer::DroneSensors> sensors;
 
-void timer_callback(rcl_timer_t * timer, int64_t last_call_time)
-{
+void timer_callback(rcl_timer_t * timer, int64_t last_call_time) {
 	RCLC_UNUSED(last_call_time);
 	if (timer != NULL) {
 		// printf("Publishing: %d\n", (int) msg.data);
@@ -64,16 +67,14 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time)
 	}
 }
 
-void subscription_callback(const void * msgin)
-{
-	const std_msgs__msg__Int32 * msg = (const std_msgs__msg__Int32 *)msgin;
-	printf("Received: %d\n",  (int)  msg->data);
-}
-
 void pwm_subscription_callback(const void * msgin) {
-	printf("received pwm values\n");
+#ifdef DEBUG
+	static int num_calls = 0;
+	num_calls++;
+	printf("[%d: %ld] received pwm values\n", num_calls, *last_value_time);
+#endif
+
 	motor_pwm_value_mutex.lock();
-	// const std_msgs__msg__Int32MultiArray *pwm_values_msg = (const std_msgs__msg__Int32MultiArray *)msgin;
 
 	const drone_controller_messages__msg__PwmMessage *pwm_values_msg = (const drone_controller_messages__msg__PwmMessage *)msgin;
 	motor_pwm_values->front_left = pwm_values_msg->front_left;
@@ -91,8 +92,7 @@ void pwm_subscription_callback(const void * msgin) {
 	motor_pwm_value_mutex.unlock();
 }
 
-void micro_ros_task(void * arg)
-{
+void micro_ros_task(void * arg) {
     printf("starting the task\n");
 	rcl_allocator_t allocator = rcl_get_default_allocator();
 	rclc_support_t support;
@@ -122,24 +122,15 @@ void micro_ros_task(void * arg)
 		ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
 		"drone_status"));
 
-	// Create subscriber.
-	RCCHECK(rclc_subscription_init_default(
-		&subscriber,
-		&node,
-		ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
-		"int32_sub"));
-
 	RCCHECK(rclc_subscription_init_default(
 		&pwm_subscription,
 		&node,
-		// rosidl_typesupport_c__get_message_type_support_handle__drone_controller_messages__msg__PwmMessage,
 		ROSIDL_GET_MSG_TYPE_SUPPORT(drone_controller_messages, msg, PwmMessage),
-		// ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32MultiArray),
 		"pwm_values"));
 
 	// create timer,
 	rcl_timer_t timer;
-	const unsigned int timer_timeout = 0500;
+	const unsigned int timer_timeout = 5000;
 	RCCHECK(rclc_timer_init_default(
 		&timer,
 		&support,
@@ -148,24 +139,18 @@ void micro_ros_task(void * arg)
 
 	// create executor
 	rclc_executor_t executor;
-	RCCHECK(rclc_executor_init(&executor, &support.context, 5, &allocator));
+	RCCHECK(rclc_executor_init(&executor, &support.context, 2, &allocator));
 	RCCHECK(rclc_executor_add_timer(&executor, &timer));
 
 	// Add timer and subscriber to executor.
-	RCCHECK(rclc_executor_add_subscription(&executor, &subscriber, &recv_int_msg, &subscription_callback, ON_NEW_DATA));
 	printf("creating pwm subscription\n");
-
-	recv_msg.data.capacity = 4;
-	recv_msg.data.size = 0;
-	recv_msg.data.data = (int32_t*) malloc(recv_msg.data.capacity * sizeof(int32_t));
-
-	// RCCHECK(rclc_executor_add_subscription(&executor, &pwm_subscription, &recv_msg, &pwm_subscription_callback, ON_NEW_DATA));
+	RCCHECK(rclc_executor_add_subscription(&executor, &pwm_subscription, &pwm_recv_msg, &pwm_subscription_callback, ON_NEW_DATA));
 
 	msg.data = 0;
 
-	while(1){
-		rclc_executor_spin_some(&executor, RCL_MS_TO_NS(1));
-		usleep(1000);
+	while(1) {
+		rclc_executor_spin_some(&executor, RCL_MS_TO_NS(10));
+		usleep(10);
 	}
 
 	// free resources
@@ -176,11 +161,54 @@ void micro_ros_task(void * arg)
   	vTaskDelete(NULL);
 }
 
+void write_pwm_values(void * arg) {
+	while(1) {
+
+		/* TODO check drone state
+		 * only write pwm values to the motors if it is IN_FLIGHT
+		 */
+		motor_pwm_value_mutex.lock();
+		uint32_t current_time = esp_timer_get_time() / 1000;
+		if (current_time - (*last_value_time) >= 1000/UPDATE_RATE_HZ) { // if the pwm values aren't being given at 100Hz
+			// TODO Initiate landing sequence
+		} else {
+			// TODO write pwm values to motor
+		}
+
+		motor_pwm_value_mutex.unlock();
+		usleep(1);
+	}
+
+	vTaskDelete(NULL);
+}
+
+void read_onboard_sensors(void * arg) {
+	while(1) {
+		double dist = sensors->read_lidar_distance();
+		// printf("the lidar distance is %f\n", dist);
+		usleep(200);
+	}
+
+	vTaskDelete(NULL);
+}
+
+void initialize_drone_hardware() {
+	DroneHardwareLayer::Motor(12);
+	printf("initializing the sensors\n");
+	sensors = std::make_shared<DroneHardwareLayer::DroneSensors>();
+}
+
+
 extern "C" void app_main(void)
 {
 #if defined(CONFIG_MICRO_ROS_ESP_NETIF_WLAN) || defined(CONFIG_MICRO_ROS_ESP_NETIF_ENET)
     ESP_ERROR_CHECK(uros_network_interface_initialize());
 #endif
+
+	motor_pwm_values = std::make_shared<motor_pwm_values_t>();
+	last_value_time = std::make_shared<uint32_t>();
+
+	initialize_drone_hardware();
 
 	/* TODO create a task to write pwm values to the motors
 	 * Before reading the motor values from `motor_pwm_values`, check the time when the last commands came in
@@ -189,12 +217,19 @@ extern "C" void app_main(void)
 	 */
 
 	// TODO task to read imu and height sensor
+	xTaskCreate(read_onboard_sensors,
+			"onboard_sensors_task",
+			2000,
+			NULL,
+			5,
+			NULL);
 
     //pin micro-ros task in APP_CPU to make PRO_CPU to deal with wifi:
     xTaskCreate(micro_ros_task,
             "uros_task",
             16000,
             NULL,
-            5, // FIXME look into the RTOS priority settings
+            5, // Low priority numbers denote low priority tasks
+			// see https://www.freertos.org/RTOS-task-priority.html
             NULL);
 }
