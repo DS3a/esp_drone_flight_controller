@@ -1,4 +1,10 @@
 dependencies:
+  espressif/eigen:
+    component_hash: 64a82d75ea6b7cb9240398ce0b6616e905d71b83a734b2cf9cb58ad09dd4f5ea
+    source:
+      service_url: https://api.components.espressif.com/
+      type: service
+    version: 3.4.0~2
   espressif/mpu6050:
     component_hash: d69219ccb141372b863c511749ffbeab28417ac71c205d7ed7030c308e1b6832
     source:
@@ -10,6 +16,6 @@ dependencies:
     source:
       type: idf
     version: 5.3.0
-manifest_hash: 1343b8e20cae3da3f6929962b9dc71a99a35a159cfddff9c5ca385f4cc7f29f4
+manifest_hash: f0b0cc1a00fda672df726e18d3aafe696e40b8e2a170a6b094ddf58ac036ec65
 target: esp32
 version: 1.0.0

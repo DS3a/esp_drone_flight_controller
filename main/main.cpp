@@ -158,7 +158,7 @@ void write_pwm_values(void * arg) {
 void read_onboard_sensors(void * arg) {
 	while(1) {
 		double dist = sensors->read_lidar_distance();
-		// printf("the lidar distance is %f\n", dist);
+		printf("the lidar distance is %f\n", dist);
 		usleep(200);
 	}
 

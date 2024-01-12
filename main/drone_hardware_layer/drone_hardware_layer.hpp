@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "tfmini_lidar.hpp"
+#include "mpu6050_abs.hpp"
 #include <memory>
 
 namespace DroneHardwareLayer {
@@ -19,7 +20,7 @@ namespace DroneHardwareLayer {
 
     class DroneSensors {
     private:
-        std::shared_ptr<TFMiniLidar::TFMiniLidar> lidar_ranger;
+        std::shared_ptr<TFMiniLidar::TFMiniLidar> lidar_ranger;        
     public:
         DroneSensors();
 
