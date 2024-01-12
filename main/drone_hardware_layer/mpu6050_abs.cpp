@@ -35,8 +35,10 @@ namespace MPU6050Abs {
 
     MPU6050Abs::MPU6050Abs() {
         this->i2c_bus_init();
-        this->i2c_sensor_mpu6050_init();
+        this->i2c_sensor_mpu6050_init();   
     }
 
     
+
+
 }
