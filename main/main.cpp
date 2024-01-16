@@ -167,8 +167,10 @@ void attitude_determination_task(void * arg) {
 	
 	while(1) {
 		double dist = sensors->read_lidar_distance();
-		// printf("the lidar distance is %f\n", dist);
-		
+#ifdef DEBUG
+		printf("the lidar distance is %f\n", dist);
+#endif
+
 		if (!gyro_calibrated) {
 			printf("calibrating the gyro\n");
 			sensors->get_imu()->calibrate_gyro();
