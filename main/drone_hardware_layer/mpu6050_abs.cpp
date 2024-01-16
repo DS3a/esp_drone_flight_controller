@@ -22,7 +22,7 @@ namespace MPU6050Abs {
     void MPU6050Abs::i2c_sensor_mpu6050_init() {
         esp_err_t ret;
 
-        i2c_bus_init();
+        // i2c_bus_init();
         this->mpu6050 = mpu6050_create(I2C_MASTER_NUM, MPU6050_I2C_ADDRESS);
         TEST_ASSERT_NOT_NULL_MESSAGE(mpu6050, "MPU6050 create returned NULL");
 
@@ -34,11 +34,83 @@ namespace MPU6050Abs {
     }
 
     MPU6050Abs::MPU6050Abs() {
+        printf("initializing the i2c bus\n");
         this->i2c_bus_init();
-        this->i2c_sensor_mpu6050_init();   
+        printf("done initializing the bus, initializing the sensor\n");
+        this->i2c_sensor_mpu6050_init();
+        printf("done initializing imu\n");
     }
 
-    
 
+    uint8_t MPU6050Abs::read_accel_values(Eigen::Vector3d *const accel) {
+        esp_err_t ret;
+        mpu6050_acce_value_t acce;
+
+        ret = mpu6050_get_acce(this->mpu6050, &acce);
+        TEST_ASSERT_EQUAL(ESP_OK, ret);
+
+        accel->x() = acce.acce_x;
+        accel->y() = acce.acce_y;
+        accel->z() = acce.acce_z;
+        
+        return 1;
+    }
+
+    uint8_t MPU6050Abs::read_gyro_values(Eigen::Vector3d *const gyro) {
+        esp_err_t ret;
+        mpu6050_gyro_value_t gyro_reading;
+
+        ret = mpu6050_get_gyro(mpu6050, &gyro_reading);
+        TEST_ASSERT_EQUAL(ESP_OK, ret);
+    
+        gyro->x() = gyro_reading.gyro_x;
+        gyro->y() = gyro_reading.gyro_y;
+        gyro->z() = gyro_reading.gyro_z;
+
+        return 1;
+    }
+
+
+    uint8_t MPU6050Abs::mean_gyro(Eigen::Vector3d *const gyro_buf) {
+        Eigen::Vector3d gyro_readings(0.0, 0.0, 0.0);
+
+        int i=0;
+        while(i++ < CALIBRATION_BUFFER + 100) {
+#ifdef DEBUG
+            printf("[%d] getting readings to calibrate\n", i);
+#endif
+            this->read_gyro_values(&gyro_readings);
+            if (i < 100)
+                continue; // skip the first 100 readings for vibes
+            else
+                (*gyro_buf) += gyro_readings;
+
+            usleep(2);
+        }
+
+        (*gyro_buf) /= CALIBRATION_BUFFER;
+
+        return 1;
+    }
+
+    uint8_t MPU6050Abs::calibrate_gyro() {
+        // read mean values to get offset
+        Eigen::Vector3d buffer_readings(0.0, 0.0, 0.0);
+        this->mean_gyro(&buffer_readings);
+        printf("the gyro offset is x: %f\t y: %f z: %f\n", buffer_readings.x(), buffer_readings.y(), buffer_readings.z());
+        
+        // mpu6050_write_ext(this->mpu6050, MPU6050_REG_GYRO_XOFFS_H, gx_offset_, 4);
+        // mpu6050_write_ext(this->mpu6050, MPU6050_REG_GYRO_YOFFS_H, (uint8_t*)gy_offset, sizeof(int));
+        // mpu6050_write_ext(this->mpu6050, MPU6050_REG_GYRO_ZOFFS_H, (uint8_t*)gz_offset, sizeof(int));
+
+        buffer_readings.x() = 0;
+        buffer_readings.y() = 0;
+        buffer_readings.z() = 0;
+        this->mean_gyro(&buffer_readings);
+        printf("the gyro offset is x: %f\t y: %f z: %f\n", buffer_readings.x(), buffer_readings.y(), buffer_readings.z());
+ 
+
+        return 1;
+    }
 
 }

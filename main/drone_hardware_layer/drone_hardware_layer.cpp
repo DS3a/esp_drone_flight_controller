@@ -16,11 +16,19 @@ namespace DroneHardwareLayer {
     DroneSensors::DroneSensors() {
         printf("initializing the TFMini-Lidar\n");
         this->lidar_ranger = std::make_shared<TFMiniLidar::TFMiniLidar>();
+
+        printf("initializing the imu\n");
+        this->imu = std::make_shared<MPU6050Abs::MPU6050Abs>();
+
     }
 
     double DroneSensors::read_lidar_distance() {
         this->lidar_ranger->read_lidar();
         return this->lidar_ranger->get_distance();        
+    }
+
+    std::shared_ptr<MPU6050Abs::MPU6050Abs> DroneSensors::get_imu() {
+        return this->imu;
     }
 
 }

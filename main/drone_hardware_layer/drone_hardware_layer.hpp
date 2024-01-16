@@ -20,10 +20,11 @@ namespace DroneHardwareLayer {
 
     class DroneSensors {
     private:
+        std::shared_ptr<MPU6050Abs::MPU6050Abs> imu;
         std::shared_ptr<TFMiniLidar::TFMiniLidar> lidar_ranger;        
     public:
         DroneSensors();
-
+        std::shared_ptr<MPU6050Abs::MPU6050Abs> get_imu();
         double read_lidar_distance();
     };
 }

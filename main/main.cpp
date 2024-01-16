@@ -25,6 +25,9 @@
 #include <drone_controller_messages/msg/pwm_message.h>
 #include <drone_controller_messages/msg/attitude_setpoint.h>
 
+
+#include <eigen3/Eigen/Eigen>
+
 #include <drone_hardware_layer/drone_hardware_layer.hpp>
 
 #ifdef CONFIG_MICRO_ROS_ESP_XRCE_DDS_MIDDLEWARE
@@ -84,7 +87,6 @@ void pwm_subscription_callback(const void * msgin) {
 }
 
 void micro_ros_task(void * arg) {
-    printf("starting the task\n");
 	rcl_allocator_t allocator = rcl_get_default_allocator();
 	rclc_support_t support;
 
@@ -155,10 +157,21 @@ void write_pwm_values(void * arg) {
 	vTaskDelete(NULL);
 }
 
-void read_onboard_sensors(void * arg) {
+void attitude_determination_task(void * arg) {
+	Eigen::Vector3d gyro_readings;
+	bool gyro_calibrated = false;
 	while(1) {
 		double dist = sensors->read_lidar_distance();
-		printf("the lidar distance is %f\n", dist);
+		// printf("the lidar distance is %f\n", dist);
+		
+		if (!gyro_calibrated) {
+			printf("calibrating the gyro\n");
+			sensors->get_imu()->calibrate_gyro();
+			gyro_calibrated = true;
+			printf("done calibrating the gyro\n");
+		}
+		sensors->get_imu()->read_gyro_values(&gyro_readings);
+		// printf("the gyro readings are x: %f\t y: %f\t z: %f\n", gyro_readings.x(), gyro_readings.y(), gyro_readings.z());
 		usleep(200);
 	}
 
@@ -189,9 +202,9 @@ extern "C" void app_main(void)
 	 * In this case use the IMUs magnetometer, gyro, and depth sensor to land
 	 */
 
-	// TODO task to read imu and height sensor
-	xTaskCreate(read_onboard_sensors,
-			"onboard_sensors_task",
+	// TODO task to read imu and height sensor and determine attitude
+	xTaskCreate(attitude_determination_task,
+			"attitude_determination_task",
 			2000,
 			NULL,
 			5,
