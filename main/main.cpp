@@ -29,6 +29,7 @@
 #include <eigen3/Eigen/Eigen>
 
 #include <drone_hardware_layer/drone_hardware_layer.hpp>
+#include <attitude_determination/attitude_determination.hpp>
 
 #ifdef CONFIG_MICRO_ROS_ESP_XRCE_DDS_MIDDLEWARE
 #include <rmw_microros/rmw_microros.h>
@@ -160,6 +161,10 @@ void write_pwm_values(void * arg) {
 void attitude_determination_task(void * arg) {
 	Eigen::Vector3d gyro_readings;
 	bool gyro_calibrated = false;
+
+	AttitudeDetermination::AttitudeDetermination ahrs;
+	ahrs.set_drone_sensors(sensors);
+	
 	while(1) {
 		double dist = sensors->read_lidar_distance();
 		// printf("the lidar distance is %f\n", dist);
