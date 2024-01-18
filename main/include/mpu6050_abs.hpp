@@ -23,6 +23,25 @@
 namespace MPU6050Abs {
     class MPU6050Abs {
     private:
+
+        int accel_x_offset = -1589;
+        int accel_y_offset = -771;
+        int accel_z_offset = 1343;
+        int gyro_x_offset = 106;
+        int gyro_y_offset = -21;
+        int gyro_z_offset = 16;
+
+        uint8_t accel_x_offset_buf[2];
+        uint8_t accel_y_offset_buf[2];
+        uint8_t accel_z_offset_buf[2];
+        uint8_t gyro_x_offset_buf[2];
+        uint8_t gyro_y_offset_buf[2];
+        uint8_t gyro_z_offset_buf[2];
+
+
+
+
+
         i2c_config_t conf;
         mpu6050_handle_t mpu6050 = NULL;
 

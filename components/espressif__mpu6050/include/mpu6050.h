@@ -394,6 +394,10 @@ esp_err_t mpu6050_get_temp(mpu6050_handle_t sensor, mpu6050_temp_value_t *const 
 esp_err_t mpu6050_complimentory_filter(mpu6050_handle_t sensor, const mpu6050_acce_value_t *const acce_value,
                                        const mpu6050_gyro_value_t *const gyro_value, complimentary_angle_t *const complimentary_angle);
 
+
+
+esp_err_t mpu6050_write_ext(mpu6050_handle_t sensor, const uint8_t reg_start_addr, const uint8_t *const data_buf, const uint8_t data_len);
+
 #ifdef __cplusplus
 }
 #endif

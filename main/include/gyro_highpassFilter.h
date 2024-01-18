@@ -6,21 +6,21 @@
 FIR filter designed with
  http://t-filter.appspot.com
 
-sampling frequency: 1000 Hz
+sampling frequency: 100 Hz
 
-* 0 Hz - 200 Hz
+* 0 Hz - 3 Hz
   gain = 0
   desired attenuation = -20 dB
-  actual attenuation = -25.043791557656363 dB
+  actual attenuation = -23.219501714950482 dB
 
-* 300 Hz - 500 Hz
+* 15 Hz - 50 Hz
   gain = 1
   desired ripple = 0.2 dB
-  actual ripple = 0.08268370078713436 dB
+  actual ripple = 0.10200844115738919 dB
 
 */
 
-#define GYRO_HIGHPASSFILTER_TAP_NUM 17
+#define GYRO_HIGHPASSFILTER_TAP_NUM 13
 
 typedef struct {
   double history[GYRO_HIGHPASSFILTER_TAP_NUM];

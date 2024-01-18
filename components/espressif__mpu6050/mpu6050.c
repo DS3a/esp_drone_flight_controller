@@ -64,6 +64,11 @@ static esp_err_t mpu6050_write(mpu6050_handle_t sensor, const uint8_t reg_start_
     return ret;
 }
 
+
+esp_err_t mpu6050_write_ext(mpu6050_handle_t sensor, const uint8_t reg_start_addr, const uint8_t *const data_buf, const uint8_t data_len) {
+    return mpu6050_write(sensor, reg_start_addr, data_buf, data_len);
+}
+
 static esp_err_t mpu6050_read(mpu6050_handle_t sensor, const uint8_t reg_start_addr, uint8_t *const data_buf, const uint8_t data_len)
 {
     mpu6050_dev_t *sens = (mpu6050_dev_t *) sensor;

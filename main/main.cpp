@@ -27,9 +27,10 @@
 
 
 #include <eigen3/Eigen/Eigen>
+#include <eigen3/Eigen/Geometry>
 
-#include <drone_hardware_layer/drone_hardware_layer.hpp>
-#include <attitude_determination/attitude_determination.hpp>
+#include <drone_hardware_layer.hpp>
+#include <attitude_determination.hpp>
 
 #ifdef CONFIG_MICRO_ROS_ESP_XRCE_DDS_MIDDLEWARE
 #include <rmw_microros/rmw_microros.h>
@@ -42,12 +43,18 @@
 #define DEBUG
 
 
+
+rcl_publisher_t odom_publisher;
 rcl_subscription_t pwm_subscription;
 
 std_msgs__msg__Int32 msg;
 drone_controller_messages__msg__PwmMessage pwm_recv_msg;
 drone_controller_messages__msg__AttitudeSetpoint attitude_recv_msg;
+nav_msgs__msg__Odometry odometry_dbg_msg;
 std_msgs__msg__Int32 recv_int_msg;
+
+
+const Eigen::Quaternion<double> *orientation;
 
 typedef struct {
 	uint32_t front_left;
@@ -87,6 +94,34 @@ void pwm_subscription_callback(const void * msgin) {
 	motor_pwm_value_mutex.unlock();
 }
 
+void timer_callback(rcl_timer_t * timer, int64_t last_call_time) {
+	RCLC_UNUSED(last_call_time);
+
+	odometry_dbg_msg.child_frame_id.capacity = 8;
+	odometry_dbg_msg.header.frame_id.capacity = 8;
+	odometry_dbg_msg.child_frame_id.data = (char*) malloc(8 * sizeof(char));
+	odometry_dbg_msg.header.frame_id.data = (char*) malloc(8 * sizeof(char));
+	strcpy(odometry_dbg_msg.child_frame_id.data, "imu\0");
+	strcpy(odometry_dbg_msg.header.frame_id.data, "odom\0");
+	// // odometry_dbg_msg.pose.pose.orientation.w = orientation.w();
+	// odometry_dbg_msg.pose.pose.orientation.w = orientation->normalized().w();
+	// odometry_dbg_msg.pose.pose.orientation.x = orientation->normalized().x();
+	// odometry_dbg_msg.pose.pose.orientation.y = orientation->normalized().y();
+	// odometry_dbg_msg.pose.pose.orientation.z = orientation->normalized().z();
+
+
+	odometry_dbg_msg.pose.pose.orientation.w = orientation->w();
+	odometry_dbg_msg.pose.pose.orientation.x = orientation->x();
+	odometry_dbg_msg.pose.pose.orientation.y = orientation->y();
+	odometry_dbg_msg.pose.pose.orientation.z = orientation->z();
+
+	if (timer != NULL) {
+		RCSOFTCHECK(rcl_publish(&odom_publisher, &odometry_dbg_msg, NULL));
+		msg.data++;
+	}
+}
+
+
 void micro_ros_task(void * arg) {
 	rcl_allocator_t allocator = rcl_get_default_allocator();
 	rclc_support_t support;
@@ -109,6 +144,22 @@ void micro_ros_task(void * arg) {
 	rcl_node_t node;
 	RCCHECK(rclc_node_init_default(&node, "drone_node", DRONE_NAME, &support));
 
+	RCCHECK(rclc_publisher_init_default(
+		&odom_publisher,
+		&node,
+		ROSIDL_GET_MSG_TYPE_SUPPORT(nav_msgs, msg, Odometry),
+		"/odom_drone"
+	));
+
+	rcl_timer_t timer;
+	const unsigned int timer_timeout = 100;
+	RCCHECK(rclc_timer_init_default(
+		&timer,
+		&support,
+		RCL_MS_TO_NS(timer_timeout),
+		timer_callback));
+
+
 	RCCHECK(rclc_subscription_init_default(
 		&pwm_subscription,
 		&node,
@@ -117,13 +168,12 @@ void micro_ros_task(void * arg) {
 
 // create executor
 	rclc_executor_t executor;
-	RCCHECK(rclc_executor_init(&executor, &support.context, 1, &allocator));
+	RCCHECK(rclc_executor_init(&executor, &support.context, 2, &allocator));
 
 	// Add timer and subscriber to executor.
 	printf("creating pwm subscription\n");
 	RCCHECK(rclc_executor_add_subscription(&executor, &pwm_subscription, &pwm_recv_msg, &pwm_subscription_callback, ON_NEW_DATA));
-
-	msg.data = 0;
+	RCCHECK(rclc_executor_add_timer(&executor, &timer));
 
 	while(1) {
 		rclc_executor_spin_some(&executor, RCL_MS_TO_NS(10));
@@ -132,6 +182,7 @@ void micro_ros_task(void * arg) {
 
 	// free resources
 	RCCHECK(rcl_subscription_fini(&pwm_subscription, &node));
+	RCCHECK(rcl_publisher_fini(&odom_publisher, &node));
 	RCCHECK(rcl_node_fini(&node));
 
   	vTaskDelete(NULL);
@@ -140,7 +191,7 @@ void micro_ros_task(void * arg) {
 void write_pwm_values(void * arg) {
 	while(1) {
 
-		/* TODO check drone state
+		/* TODO check drone stat
 		 * only write pwm values to the motors if it is IN_FLIGHT
 		 */
 		motor_pwm_value_mutex.lock();
@@ -160,14 +211,14 @@ void write_pwm_values(void * arg) {
 
 void attitude_determination_task(void * arg) {
 	Eigen::Vector3d gyro_readings;
-	bool gyro_calibrated = false;
+	bool gyro_calibrated = true;
 
 	AttitudeDetermination::AttitudeDetermination ahrs;
 	ahrs.set_drone_sensors(sensors);
 	
 	while(1) {
 		double dist = sensors->read_lidar_distance();
-#ifdef DEBUG
+#ifndef DEBUG
 		printf("the lidar distance is %f\n", dist);
 #endif
 
@@ -177,9 +228,14 @@ void attitude_determination_task(void * arg) {
 			gyro_calibrated = true;
 			printf("done calibrating the gyro\n");
 		}
-		sensors->get_imu()->read_gyro_values(&gyro_readings);
-		// printf("the gyro readings are x: %f\t y: %f\t z: %f\n", gyro_readings.x(), gyro_readings.y(), gyro_readings.z());
-		usleep(200);
+		// sensors->get_imu()->read_gyro_values(&gyro_readings);
+		ahrs.read_gyro_filtered(&gyro_readings);
+		ahrs.update_orientation(0.01);
+		orientation = ahrs.get_orientation();
+		// printf("the gyro readings\nx: %f\n y: %f\n z: %f\n", gyro_readings.x(), gyro_readings.y(), gyro_readings.z());
+		// printf("%f, %f, %f\n", gyro_readings.x(), gyro_readings.y(), gyro_readings.z());
+
+		vTaskDelay(10 /  portTICK_PERIOD_MS);
 	}
 
 	vTaskDelete(NULL);
@@ -212,7 +268,7 @@ extern "C" void app_main(void)
 	// TODO task to read imu and height sensor and determine attitude
 	xTaskCreate(attitude_determination_task,
 			"attitude_determination_task",
-			2000,
+			12000,
 			NULL,
 			5,
 			NULL);

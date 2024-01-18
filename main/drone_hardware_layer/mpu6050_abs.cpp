@@ -1,4 +1,18 @@
 #include "mpu6050_abs.hpp"
+#include <math.h>
+
+
+/*
+ TODO set offset values
+
+Sensor readings with offsets:	8	-10	16384	1	2	0
+Your offsets:	-1589	-771	1343	106	-21	16
+
+Data is printed as: acelX acelY acelZ giroX giroY giroZ
+Check that your sensor readings are close to 0 0 16384 0 0 0
+
+*/
+
 
 namespace MPU6050Abs {
 
@@ -22,6 +36,21 @@ namespace MPU6050Abs {
     void MPU6050Abs::i2c_sensor_mpu6050_init() {
         esp_err_t ret;
 
+        accel_x_offset = -1589;
+        accel_y_offset = -771;
+        accel_z_offset = 1343;
+        gyro_x_offset = 106;
+        gyro_y_offset = -21;
+        gyro_z_offset = 16;
+        
+
+        memcpy(accel_x_offset_buf, &accel_x_offset, sizeof(int));
+        memcpy(accel_y_offset_buf, &accel_y_offset, sizeof(int));
+        memcpy(accel_z_offset_buf, &accel_z_offset, sizeof(int));
+        memcpy(gyro_x_offset_buf, &gyro_x_offset, sizeof(int));
+        memcpy(gyro_y_offset_buf, &gyro_y_offset, sizeof(int));
+        memcpy(gyro_z_offset_buf, &gyro_z_offset, sizeof(int));
+
         // i2c_bus_init();
         this->mpu6050 = mpu6050_create(I2C_MASTER_NUM, MPU6050_I2C_ADDRESS);
         TEST_ASSERT_NOT_NULL_MESSAGE(mpu6050, "MPU6050 create returned NULL");
@@ -30,7 +59,24 @@ namespace MPU6050Abs {
         TEST_ASSERT_EQUAL(ESP_OK, ret);
 
         ret = mpu6050_wake_up(mpu6050);
-        TEST_ASSERT_EQUAL(ESP_OK, ret);        
+        TEST_ASSERT_EQUAL(ESP_OK, ret);   
+
+        mpu6050_write_ext(mpu6050, MPU6050_REG_ACCEL_XOFFS_H, &accel_x_offset_buf[1], sizeof(uint8_t));
+        mpu6050_write_ext(mpu6050, MPU6050_REG_ACCEL_YOFFS_H, &accel_y_offset_buf[1], sizeof(uint8_t));
+        mpu6050_write_ext(mpu6050, MPU6050_REG_ACCEL_ZOFFS_H, &accel_z_offset_buf[1], sizeof(uint8_t));
+
+        mpu6050_write_ext(mpu6050, MPU6050_REG_ACCEL_XOFFS_L, &accel_x_offset_buf[0], sizeof(uint8_t));
+        mpu6050_write_ext(mpu6050, MPU6050_REG_ACCEL_YOFFS_L, &accel_y_offset_buf[0], sizeof(uint8_t));
+        mpu6050_write_ext(mpu6050, MPU6050_REG_ACCEL_ZOFFS_L, &accel_z_offset_buf[0], sizeof(uint8_t));
+
+        mpu6050_write_ext(mpu6050, MPU6050_REG_GYRO_XOFFS_H, &gyro_x_offset_buf[1], sizeof(uint8_t));
+        mpu6050_write_ext(mpu6050, MPU6050_REG_GYRO_YOFFS_H, &gyro_y_offset_buf[1], sizeof(uint8_t));
+        mpu6050_write_ext(mpu6050, MPU6050_REG_GYRO_ZOFFS_H, &gyro_z_offset_buf[1], sizeof(uint8_t));
+
+        mpu6050_write_ext(mpu6050, MPU6050_REG_GYRO_XOFFS_L, &gyro_x_offset_buf[0], sizeof(uint8_t));
+        mpu6050_write_ext(mpu6050, MPU6050_REG_GYRO_YOFFS_L, &gyro_y_offset_buf[0], sizeof(uint8_t));
+        mpu6050_write_ext(mpu6050, MPU6050_REG_GYRO_ZOFFS_L, &gyro_z_offset_buf[0], sizeof(uint8_t));
+
     }
 
     MPU6050Abs::MPU6050Abs() {
@@ -52,7 +98,8 @@ namespace MPU6050Abs {
         accel->x() = acce.acce_x;
         accel->y() = acce.acce_y;
         accel->z() = acce.acce_z;
-        
+
+        *accel *= 9.8; 
         return 1;
     }
 
@@ -63,10 +110,16 @@ namespace MPU6050Abs {
         ret = mpu6050_get_gyro(mpu6050, &gyro_reading);
         TEST_ASSERT_EQUAL(ESP_OK, ret);
     
-        gyro->x() = gyro_reading.gyro_x;
-        gyro->y() = gyro_reading.gyro_y;
-        gyro->z() = gyro_reading.gyro_z;
+        gyro->x() = gyro_reading.gyro_x * M_PI / 180.0;
+        gyro->y() = gyro_reading.gyro_y * M_PI / 180.0;
+        gyro->z() = gyro_reading.gyro_z * M_PI / 180.0;
 
+
+        // gyro->x() = gyro_reading.gyro_x / 131.0;
+        // gyro->y() = gyro_reading.gyro_y / 131.0;
+        // gyro->z() = gyro_reading.gyro_z / 131.0;
+
+        // returns in radian per second
         return 1;
     }
 
@@ -107,7 +160,7 @@ namespace MPU6050Abs {
         buffer_readings.y() = 0;
         buffer_readings.z() = 0;
         this->mean_gyro(&buffer_readings);
-        printf("the gyro offset is x: %f\t y: %f z: %f\n", buffer_readings.x(), buffer_readings.y(), buffer_readings.z());
+        printf("the gyro offset is x: %f\t y: %f z: %f \n", buffer_readings.x(), buffer_readings.y(), buffer_readings.z());
  
 
         return 1;
