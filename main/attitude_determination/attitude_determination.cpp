@@ -24,7 +24,7 @@ namespace AttitudeDetermination {
         this->drone_sensors_ = drone_sensors;
    }
 
-    void AttitudeDetermination::read_accel_filtered(Eigen::Vector3d *const accel_filtered) {
+    void AttitudeDetermination::read_accel_filtered(Eigen::Vector3f *const accel_filtered) {
         this->drone_sensors_->get_imu()->read_accel_values(&(this->accel_values));
 
         accel_lowpassFilter_put(&this->accel_filter[0], accel_values.x());
@@ -36,7 +36,7 @@ namespace AttitudeDetermination {
         accel_filtered->z() = accel_lowpassFilter_get(&this->accel_filter[2]);
     }
 
-    void AttitudeDetermination::read_gyro_filtered(Eigen::Vector3d *const gyro_filtered) {
+    void AttitudeDetermination::read_gyro_filtered(Eigen::Vector3f *const gyro_filtered) {
         this->drone_sensors_->get_imu()->read_gyro_values(&gyro_values);
         gyro_highpassFilter_put(&(this->gyro_filter[0]), gyro_values.x());
         gyro_highpassFilter_put(&(this->gyro_filter[1]), gyro_values.y());
@@ -63,7 +63,7 @@ namespace AttitudeDetermination {
         this->drone_sensors_->get_imu()->read_gyro_values(&(this->gyro_filtered_values));
 
         this->gyro_filtered_values *= this->mean_error; // mean error
-        // this->gyro_filtered_values = Eigen::Vector3d(0, 0, 0);
+        // this->gyro_filtered_values = Eigen::Vector3f(0, 0, 0);
 
         if (calculated_orientation) {
             // update orientation error using accelerometer measurements
@@ -72,7 +72,7 @@ namespace AttitudeDetermination {
             // this->read_accel_filtered(&this->accel_filtered_values);
             this->drone_sensors_->get_imu()->read_accel_values(&(this->accel_filtered_values));
 
-            printf("x %f\ty: %f\tz: %f\n", accel_filtered_values.x(), accel_filtered_values.y(), accel_filtered_values.z());
+            // printf("x %f\ty: %f\tz: %f\n", accel_filtered_values.x(), accel_filtered_values.y(), accel_filtered_values.z());
             g_direction.x() = 2 * (orientation.x()*orientation.z() - orientation.w()*orientation.y());
             g_direction.y() = 2 * (orientation.w()*orientation.x() + orientation.y()*orientation.z());
             g_direction.z() = orientation.w()*orientation.w() -
@@ -82,14 +82,12 @@ namespace AttitudeDetermination {
 
             this->e = this->accel_filtered_values.cross(this->g_direction);
             this->e_i += this->e * dT;
-            if (this->e_i.norm() >= 2) {
+            if (this->e_i.norm() >= 20) {
                 // integral windup
-                this->e_i = Eigen::Vector3d(0, 0, 0);
+                this->e_i = Eigen::Vector3f(0, 0, 0);
             }
-            this->e_d = (this->e_old - this->e) / dT;
 
-            this->gyro_filtered_values += this->Kp * this->e + this->Ki * this->e_i + this->Kd * this->e_d;
-            this->e_old = this->e;
+            this->gyro_filtered_values += this->Kp * this->e + this->Ki * this->e_i;
 #endif
 
 #ifdef MADGWICK
@@ -111,12 +109,12 @@ namespace AttitudeDetermination {
 
         if (!calculated_orientation) {
             calculated_orientation = true;
-            this->e = Eigen::Vector3d(0, 0, 0);
-            this->e_i = Eigen::Vector3d(0, 0, 0);
+            this->e = Eigen::Vector3f(0, 0, 0);
+            this->e_i = Eigen::Vector3f(0, 0, 0);
         }
     }
 
-    const Eigen::Quaternion<double> * AttitudeDetermination::get_orientation() {
+    const Eigen::Quaternion<float> * AttitudeDetermination::get_orientation() {
         return &(this->orientation);
     }
 }

@@ -45,17 +45,15 @@
 
 
 rcl_publisher_t odom_publisher;
-rcl_subscription_t pwm_subscription;
 rcl_subscription_t attitude_setpoint_subscription;
 
 std_msgs__msg__Int32 msg;
-drone_controller_messages__msg__PwmMessage pwm_recv_msg;
 drone_controller_messages__msg__AttitudeSetpoint attitude_recv_msg;
 nav_msgs__msg__Odometry odometry_dbg_msg;
 std_msgs__msg__Int32 recv_int_msg;
 
 
-const Eigen::Quaternion<double> *orientation;
+const Eigen::Quaternion<float> *orientation;
 
 typedef struct {
 	uint32_t front_left;
@@ -68,32 +66,6 @@ std::shared_ptr<motor_pwm_values_t> motor_pwm_values;
 std::shared_ptr<uint32_t> last_value_time;
 std::mutex motor_pwm_value_mutex;
 std::shared_ptr<DroneHardwareLayer::DroneSensors> sensors;
-
-
-void pwm_subscription_callback(const void * msgin) {
-#ifdef DEBUG
-	static int num_calls = 0;
-	num_calls++;
-	printf("[%d: %ld] received pwm values\n", num_calls, *last_value_time);
-#endif
-
-	motor_pwm_value_mutex.lock();
-
-	const drone_controller_messages__msg__PwmMessage *pwm_values_msg = (const drone_controller_messages__msg__PwmMessage *)msgin;
-	motor_pwm_values->front_left = pwm_values_msg->front_left;
-	motor_pwm_values->front_right = pwm_values_msg->front_right;
-	motor_pwm_values->back_right = pwm_values_msg->back_right;
-	motor_pwm_values->back_left = pwm_values_msg->back_left;
-	*last_value_time = esp_timer_get_time() / 1000;
-
-	printf("fl: %ld\t fr: %ld\t br: %ld\t bl: %ld\n",
-		motor_pwm_values->front_left,
-		motor_pwm_values->front_right,
-		motor_pwm_values->back_right,
-		motor_pwm_values->back_left
-	);
-	motor_pwm_value_mutex.unlock();
-}
 
 void attitude_subscription_callback(const void * msgin) {
 #ifdef DEBUG
@@ -194,7 +166,6 @@ void micro_ros_task(void * arg) {
 
 	// Add timer and subscriber to executor.
 	printf("creating attitude subscription\n");
-	// RCCHECK(rclc_executor_add_subscription(&executor, &pwm_subscription, &pwm_recv_msg, &pwm_subscription_callback, ON_NEW_DATA));
 	RCCHECK(rclc_executor_add_subscription(&executor, &attitude_setpoint_subscription, &attitude_recv_msg, &attitude_subscription_callback, ON_NEW_DATA));
 	RCCHECK(rclc_executor_add_timer(&executor, &timer));
 
@@ -204,7 +175,7 @@ void micro_ros_task(void * arg) {
 	}
 
 	// free resources
-	RCCHECK(rcl_subscription_fini(&pwm_subscription, &node));
+	RCCHECK(rcl_subscription_fini(&attitude_setpoint_subscription, &node));
 	RCCHECK(rcl_publisher_fini(&odom_publisher, &node));
 	RCCHECK(rcl_node_fini(&node));
 
@@ -233,7 +204,7 @@ void write_pwm_values(void * arg) {
 }
 
 void attitude_determination_task(void * arg) {
-	Eigen::Vector3d gyro_readings;
+	Eigen::Vector3f gyro_readings;
 	bool gyro_calibrated = true;
 
 	AttitudeDetermination::AttitudeDetermination ahrs;

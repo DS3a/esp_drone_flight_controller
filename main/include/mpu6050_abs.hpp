@@ -31,7 +31,7 @@ namespace MPU6050Abs {
         int gyro_y_offset = -21;
         int gyro_z_offset = 16;
 
-        Eigen::Matrix3d z_axis_270_rot;
+        Eigen::Matrix3f z_axis_270_rot;
         uint8_t accel_x_offset_buf[2];
         uint8_t accel_y_offset_buf[2];
         uint8_t accel_z_offset_buf[2];
@@ -50,10 +50,10 @@ namespace MPU6050Abs {
         MPU6050Abs();
         void i2c_bus_init();
         void i2c_sensor_mpu6050_init();
-        uint8_t read_accel_values(Eigen::Vector3d *const accel);
-        uint8_t read_gyro_values(Eigen::Vector3d *const gyro);
+        uint8_t read_accel_values(Eigen::Vector3f *const accel);
+        uint8_t read_gyro_values(Eigen::Vector3f*const gyro);
 
-        uint8_t mean_gyro(Eigen::Vector3d *const gyro_buf);
+        uint8_t mean_gyro(Eigen::Vector3f *const gyro_buf);
         uint8_t calibrate_gyro();
     
     };

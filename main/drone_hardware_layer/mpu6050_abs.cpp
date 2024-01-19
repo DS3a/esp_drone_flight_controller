@@ -94,7 +94,7 @@ namespace MPU6050Abs {
     }
 
 
-    uint8_t MPU6050Abs::read_accel_values(Eigen::Vector3d *const accel) {
+    uint8_t MPU6050Abs::read_accel_values(Eigen::Vector3f *const accel) {
         esp_err_t ret;
         mpu6050_acce_value_t acce;
 
@@ -111,7 +111,7 @@ namespace MPU6050Abs {
         return 1;
     }
 
-    uint8_t MPU6050Abs::read_gyro_values(Eigen::Vector3d *const gyro) {
+    uint8_t MPU6050Abs::read_gyro_values(Eigen::Vector3f *const gyro) {
         esp_err_t ret;
         mpu6050_gyro_value_t gyro_reading;
 
@@ -134,8 +134,8 @@ namespace MPU6050Abs {
     }
 
 
-    uint8_t MPU6050Abs::mean_gyro(Eigen::Vector3d *const gyro_buf) {
-        Eigen::Vector3d gyro_readings(0.0, 0.0, 0.0);
+    uint8_t MPU6050Abs::mean_gyro(Eigen::Vector3f *const gyro_buf) {
+        Eigen::Vector3f gyro_readings(0.0, 0.0, 0.0);
 
         int i=0;
         while(i++ < CALIBRATION_BUFFER + 100) {
@@ -158,7 +158,7 @@ namespace MPU6050Abs {
 
     uint8_t MPU6050Abs::calibrate_gyro() {
         // read mean values to get offset
-        Eigen::Vector3d buffer_readings(0.0, 0.0, 0.0);
+        Eigen::Vector3f buffer_readings(0.0, 0.0, 0.0);
         this->mean_gyro(&buffer_readings);
         printf("the gyro offset is x: %f\t y: %f z: %f\n", buffer_readings.x(), buffer_readings.y(), buffer_readings.z());
         
