@@ -31,6 +31,7 @@ namespace MPU6050Abs {
         int gyro_y_offset = -21;
         int gyro_z_offset = 16;
 
+        Eigen::Matrix3d z_axis_270_rot;
         uint8_t accel_x_offset_buf[2];
         uint8_t accel_y_offset_buf[2];
         uint8_t accel_z_offset_buf[2];

@@ -46,6 +46,7 @@
 
 rcl_publisher_t odom_publisher;
 rcl_subscription_t pwm_subscription;
+rcl_subscription_t attitude_setpoint_subscription;
 
 std_msgs__msg__Int32 msg;
 drone_controller_messages__msg__PwmMessage pwm_recv_msg;
@@ -94,6 +95,33 @@ void pwm_subscription_callback(const void * msgin) {
 	motor_pwm_value_mutex.unlock();
 }
 
+void attitude_subscription_callback(const void * msgin) {
+#ifdef DEBUG
+	static int num_calls = 0;
+	num_calls++;
+	printf("[%d: %ld] received attitude values\n", num_calls, *last_value_time);
+#endif
+
+	// motor_pwm_value_mutex.lock();
+
+	// const drone_controller_messages__msg__PwmMessage *pwm_values_msg = (const drone_controller_messages__msg__PwmMessage *)msgin;
+	const drone_controller_messages__msg__AttitudeSetpoint *attitude_setpoint_msg = (const drone_controller_messages__msg__AttitudeSetpoint *)msgin;
+	// motor_pwm_values->front_left = pwm_values_msg->front_left;
+	// motor_pwm_values->front_right = pwm_values_msg->front_right;
+	// motor_pwm_values->back_right = pwm_values_msg->back_right;
+	// motor_pwm_values->back_left = pwm_values_msg->back_left;
+	*last_value_time = esp_timer_get_time() / 1000;
+
+	printf("roll: %f\t pitch: %f\t yawrate: %f\t thrust: %f\n",
+		attitude_setpoint_msg->roll,
+		attitude_setpoint_msg->pitch,
+		attitude_setpoint_msg->yawrate,
+		attitude_setpoint_msg->thrust
+	);
+	// motor_pwm_value_mutex.unlock();
+}
+
+
 void timer_callback(rcl_timer_t * timer, int64_t last_call_time) {
 	RCLC_UNUSED(last_call_time);
 
@@ -103,12 +131,6 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time) {
 	odometry_dbg_msg.header.frame_id.data = (char*) malloc(8 * sizeof(char));
 	strcpy(odometry_dbg_msg.child_frame_id.data, "imu\0");
 	strcpy(odometry_dbg_msg.header.frame_id.data, "odom\0");
-	// // odometry_dbg_msg.pose.pose.orientation.w = orientation.w();
-	// odometry_dbg_msg.pose.pose.orientation.w = orientation->normalized().w();
-	// odometry_dbg_msg.pose.pose.orientation.x = orientation->normalized().x();
-	// odometry_dbg_msg.pose.pose.orientation.y = orientation->normalized().y();
-	// odometry_dbg_msg.pose.pose.orientation.z = orientation->normalized().z();
-
 
 	odometry_dbg_msg.pose.pose.orientation.w = orientation->w();
 	odometry_dbg_msg.pose.pose.orientation.x = orientation->x();
@@ -152,7 +174,7 @@ void micro_ros_task(void * arg) {
 	));
 
 	rcl_timer_t timer;
-	const unsigned int timer_timeout = 100;
+	const unsigned int timer_timeout = 1;
 	RCCHECK(rclc_timer_init_default(
 		&timer,
 		&support,
@@ -161,18 +183,19 @@ void micro_ros_task(void * arg) {
 
 
 	RCCHECK(rclc_subscription_init_default(
-		&pwm_subscription,
+		&attitude_setpoint_subscription,
 		&node,
-		ROSIDL_GET_MSG_TYPE_SUPPORT(drone_controller_messages, msg, PwmMessage),
-		"pwm_values"));
+		ROSIDL_GET_MSG_TYPE_SUPPORT(drone_controller_messages, msg, AttitudeSetpoint),
+		"attitude_setpoint"));
 
 // create executor
 	rclc_executor_t executor;
 	RCCHECK(rclc_executor_init(&executor, &support.context, 2, &allocator));
 
 	// Add timer and subscriber to executor.
-	printf("creating pwm subscription\n");
-	RCCHECK(rclc_executor_add_subscription(&executor, &pwm_subscription, &pwm_recv_msg, &pwm_subscription_callback, ON_NEW_DATA));
+	printf("creating attitude subscription\n");
+	// RCCHECK(rclc_executor_add_subscription(&executor, &pwm_subscription, &pwm_recv_msg, &pwm_subscription_callback, ON_NEW_DATA));
+	RCCHECK(rclc_executor_add_subscription(&executor, &attitude_setpoint_subscription, &attitude_recv_msg, &attitude_subscription_callback, ON_NEW_DATA));
 	RCCHECK(rclc_executor_add_timer(&executor, &timer));
 
 	while(1) {
@@ -229,13 +252,13 @@ void attitude_determination_task(void * arg) {
 			printf("done calibrating the gyro\n");
 		}
 		// sensors->get_imu()->read_gyro_values(&gyro_readings);
-		ahrs.read_gyro_filtered(&gyro_readings);
-		ahrs.update_orientation(0.01);
+		// ahrs.read_gyro_filtered(&gyro_readings);
+		ahrs.update_orientation(0.001);
 		orientation = ahrs.get_orientation();
 		// printf("the gyro readings\nx: %f\n y: %f\n z: %f\n", gyro_readings.x(), gyro_readings.y(), gyro_readings.z());
 		// printf("%f, %f, %f\n", gyro_readings.x(), gyro_readings.y(), gyro_readings.z());
 
-		vTaskDelay(10 /  portTICK_PERIOD_MS);
+		vTaskDelay(1 /  portTICK_PERIOD_MS);
 	}
 
 	vTaskDelete(NULL);
@@ -268,7 +291,7 @@ extern "C" void app_main(void)
 	// TODO task to read imu and height sensor and determine attitude
 	xTaskCreate(attitude_determination_task,
 			"attitude_determination_task",
-			12000,
+			16000,
 			NULL,
 			5,
 			NULL);

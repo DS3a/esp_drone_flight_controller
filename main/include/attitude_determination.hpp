@@ -12,9 +12,10 @@
 namespace AttitudeDetermination {
     class AttitudeDetermination {
     private:
-        double Kp = 0.65;
-        double Ki = 0.01;
+        double Kp = 0.95;
+        double Ki = 0.1;
         double Kd = 0.00;
+        double mean_error = 10.0;
         bool calculated_orientation = false;
         Eigen::Quaternion<double> orientation;
         Eigen::Quaternion<double> velocity_quat;

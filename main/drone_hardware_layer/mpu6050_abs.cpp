@@ -80,6 +80,12 @@ namespace MPU6050Abs {
     }
 
     MPU6050Abs::MPU6050Abs() {
+        this->z_axis_270_rot << 
+            0, -1, 0,
+            1, 0, 0,
+            0, 0, 1
+        ;
+
         printf("initializing the i2c bus\n");
         this->i2c_bus_init();
         printf("done initializing the bus, initializing the sensor\n");
@@ -99,6 +105,8 @@ namespace MPU6050Abs {
         accel->y() = acce.acce_y;
         accel->z() = acce.acce_z;
 
+        *accel = this->z_axis_270_rot * (*accel);
+
         *accel *= 9.8; 
         return 1;
     }
@@ -114,6 +122,8 @@ namespace MPU6050Abs {
         gyro->y() = gyro_reading.gyro_y * M_PI / 180.0;
         gyro->z() = gyro_reading.gyro_z * M_PI / 180.0;
 
+
+        *gyro = this->z_axis_270_rot * (*gyro);
 
         // gyro->x() = gyro_reading.gyro_x / 131.0;
         // gyro->y() = gyro_reading.gyro_y / 131.0;

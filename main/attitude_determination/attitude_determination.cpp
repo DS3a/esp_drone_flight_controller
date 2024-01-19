@@ -2,6 +2,8 @@
 
 #define MU 0.99
 
+#define MAHONY
+
 namespace AttitudeDetermination {
     AttitudeDetermination::AttitudeDetermination() {
         gyro_highpassFilter_init(&(this->gyro_filter[0])); // for x axis
@@ -60,12 +62,15 @@ namespace AttitudeDetermination {
 
         this->drone_sensors_->get_imu()->read_gyro_values(&(this->gyro_filtered_values));
 
-        // this->gyro_filtered_values *= 1.2;
+        this->gyro_filtered_values *= this->mean_error; // mean error
+        // this->gyro_filtered_values = Eigen::Vector3d(0, 0, 0);
 
         if (calculated_orientation) {
             // update orientation error using accelerometer measurements
-            this->read_accel_filtered(&this->accel_filtered_values);
-            // this->drone_sensors_->get_imu()->read_accel_values(&(this->accel_values));
+
+#ifdef MAHONY
+            // this->read_accel_filtered(&this->accel_filtered_values);
+            this->drone_sensors_->get_imu()->read_accel_values(&(this->accel_filtered_values));
 
             printf("x %f\ty: %f\tz: %f\n", accel_filtered_values.x(), accel_filtered_values.y(), accel_filtered_values.z());
             g_direction.x() = 2 * (orientation.x()*orientation.z() - orientation.w()*orientation.y());
@@ -77,10 +82,20 @@ namespace AttitudeDetermination {
 
             this->e = this->accel_filtered_values.cross(this->g_direction);
             this->e_i += this->e * dT;
+            if (this->e_i.norm() >= 2) {
+                // integral windup
+                this->e_i = Eigen::Vector3d(0, 0, 0);
+            }
             this->e_d = (this->e_old - this->e) / dT;
 
             this->gyro_filtered_values += this->Kp * this->e + this->Ki * this->e_i + this->Kd * this->e_d;
             this->e_old = this->e;
+#endif
+
+#ifdef MADGWICK
+        this->orientation.conjugate();
+#endif
+
         }
 
         this->velocity_quat.w() = 0;
