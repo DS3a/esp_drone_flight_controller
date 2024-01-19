@@ -54,6 +54,8 @@ std_msgs__msg__Int32 recv_int_msg;
 
 
 const Eigen::Quaternion<float> *orientation;
+const float *drone_height;
+std::mutex drone_attitude_mutex;
 
 typedef struct {
 	uint32_t front_left;
@@ -76,12 +78,7 @@ void attitude_subscription_callback(const void * msgin) {
 
 	// motor_pwm_value_mutex.lock();
 
-	// const drone_controller_messages__msg__PwmMessage *pwm_values_msg = (const drone_controller_messages__msg__PwmMessage *)msgin;
 	const drone_controller_messages__msg__AttitudeSetpoint *attitude_setpoint_msg = (const drone_controller_messages__msg__AttitudeSetpoint *)msgin;
-	// motor_pwm_values->front_left = pwm_values_msg->front_left;
-	// motor_pwm_values->front_right = pwm_values_msg->front_right;
-	// motor_pwm_values->back_right = pwm_values_msg->back_right;
-	// motor_pwm_values->back_left = pwm_values_msg->back_left;
 	*last_value_time = esp_timer_get_time() / 1000;
 
 	printf("roll: %f\t pitch: %f\t yawrate: %f\t thrust: %f\n",
@@ -146,7 +143,7 @@ void micro_ros_task(void * arg) {
 	));
 
 	rcl_timer_t timer;
-	const unsigned int timer_timeout = 1;
+	const unsigned int timer_timeout = 100;
 	RCCHECK(rclc_timer_init_default(
 		&timer,
 		&support,
@@ -235,12 +232,21 @@ void attitude_determination_task(void * arg) {
 	vTaskDelete(NULL);
 }
 
+
+void drone_sitch_tracking_task(void * arg) {
+	while (1) {
+		usleep(100);
+	}
+
+
+	vTaskDelete(NULL);
+}
+
 void initialize_drone_hardware() {
 	DroneHardwareLayer::Motor(12);
 	printf("initializing the sensors\n");
 	sensors = std::make_shared<DroneHardwareLayer::DroneSensors>();
 }
-
 
 extern "C" void app_main(void)
 {
@@ -266,6 +272,14 @@ extern "C" void app_main(void)
 			NULL,
 			5,
 			NULL);
+
+	xTaskCreate(drone_sitch_tracking_task,
+			"drone_sitch_tracking_task",
+			4000,
+			NULL,
+			3,
+			NULL);
+
 
     //pin micro-ros task in APP_CPU to make PRO_CPU to deal with wifi:
     xTaskCreate(micro_ros_task,

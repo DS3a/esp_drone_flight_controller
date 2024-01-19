@@ -60,7 +60,10 @@ namespace AttitudeDetermination {
     void AttitudeDetermination::update_orientation(double dT=0.001) {
         // this->read_gyro_filtered(&(this->gyro_filtered_values));
 
-        this->drone_sensors_->get_imu()->read_gyro_values(&(this->gyro_filtered_values));
+        uint8_t ret = this->drone_sensors_->get_imu()->read_gyro_values(&(this->gyro_filtered_values));
+        if (!ret) {
+            return;
+        }
 
         this->gyro_filtered_values *= this->mean_error; // mean error
         // this->gyro_filtered_values = Eigen::Vector3f(0, 0, 0);
@@ -70,7 +73,10 @@ namespace AttitudeDetermination {
 
 #ifdef MAHONY
             // this->read_accel_filtered(&this->accel_filtered_values);
-            this->drone_sensors_->get_imu()->read_accel_values(&(this->accel_filtered_values));
+            uint8_t ret = this->drone_sensors_->get_imu()->read_accel_values(&(this->accel_filtered_values));
+            if (!ret) {
+                return;
+            }
 
             // printf("x %f\ty: %f\tz: %f\n", accel_filtered_values.x(), accel_filtered_values.y(), accel_filtered_values.z());
             g_direction.x() = 2 * (orientation.x()*orientation.z() - orientation.w()*orientation.y());

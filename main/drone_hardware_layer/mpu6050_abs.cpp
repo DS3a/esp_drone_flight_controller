@@ -99,7 +99,9 @@ namespace MPU6050Abs {
         mpu6050_acce_value_t acce;
 
         ret = mpu6050_get_acce(this->mpu6050, &acce);
-        TEST_ASSERT_EQUAL(ESP_OK, ret);
+        if (ESP_OK != ret) {
+            return 0;
+        }
 
         accel->x() = acce.acce_x;
         accel->y() = acce.acce_y;
@@ -116,8 +118,10 @@ namespace MPU6050Abs {
         mpu6050_gyro_value_t gyro_reading;
 
         ret = mpu6050_get_gyro(mpu6050, &gyro_reading);
-        TEST_ASSERT_EQUAL(ESP_OK, ret);
-    
+        if (ESP_OK != ret) {
+            return 0;
+        }
+
         gyro->x() = gyro_reading.gyro_x * M_PI / 180.0;
         gyro->y() = gyro_reading.gyro_y * M_PI / 180.0;
         gyro->z() = gyro_reading.gyro_z * M_PI / 180.0;
